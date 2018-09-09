@@ -26,6 +26,14 @@ class Debug:
 
             await self.client.say(embed=embed)
 
+    @commands.command(pass_context=True,
+                      description="Refreshes permission cache",
+                      help="Refreshes permission cache")
+    async def refreshAuthCache(self, ctx):
+        if self.auth.can(ctx.message.author, config.DEBUG):
+            self.auth.refresh()
+            await self.client.say('Reset auth cache, the subsequent operations will be read from DB')
+
 
 def setup(client):
     client.add_cog(Debug(client, db.cursor, db.auth))

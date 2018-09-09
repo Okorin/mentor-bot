@@ -79,6 +79,7 @@ async def sync_users():
         # async sleep for 3 hours
         await asyncio.sleep(9800)
 
+
 @client.event
 async def on_ready():
     print('Bot started')

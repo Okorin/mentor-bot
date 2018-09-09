@@ -24,10 +24,10 @@ class Management:
         self.client = client
         self.cursor = cursor
         self.auth = auth
-        self.gamemodes = self.preload_value_list('gamemodes')
-        self.cycle_user_types = self.preload_value_list('cycle_users_types')
+        self.gamemodes = self._preload_value_list('gamemodes')
+        self.cycle_user_types = self._preload_value_list('cycle_users_types')
 
-    def preload_value_list(self, table_name):
+    def _preload_value_list(self, table_name):
         query = 'SELECT id, name FROM {}'.format(table_name)
         self.cursor.execute(query)
         result = self.cursor.fetchall()
@@ -35,7 +35,7 @@ class Management:
             return {result[i][1]: result[i][0] for i in range(0, len(result))}
         return dict()
 
-    async def parse_datetime(self, ctx, date_string, return_as_string=True):
+    async def _parse_datetime(self, ctx, date_string, return_as_string=True):
         dt = None
         try:
             dt = datetime.datetime.strptime(date_string, '%d.%m.%Y')
@@ -48,7 +48,7 @@ class Management:
                                            'Formatting of {} into a proper timestamp failed'.format(date_string))
         return dt
 
-    def get_member_from_db(self, member):
+    def _get_member_from_db(self, member):
         if isinstance(member, discord.Member):
             query = 'SELECT name, osu_user_id, discord_id, verified, id ' \
                     'FROM users WHERE discord_id = \'{}\' and deleted_at IS NULL'.format(member.id)
@@ -91,7 +91,7 @@ class Management:
 
                     # yes
                     if self.cursor.fetchone():
-                        user = self.get_member_from_db(member)
+                        user = self._get_member_from_db(member)
                         if user:
                             # final check: does this combination already exist as a cycle user
                             query = 'SELECT id FROM cycle_users WHERE ' \
@@ -160,8 +160,8 @@ class Management:
                     if user1 and user2:
 
                         # read what they are in the database
-                        user_a = self.get_member_from_db(user1)
-                        user_b = self.get_member_from_db(user2)
+                        user_a = self._get_member_from_db(user1)
+                        user_b = self._get_member_from_db(user2)
 
                         # both are found
                         if user_a and user_b:
@@ -223,12 +223,12 @@ class Management:
             created_at = now()
 
             # i dont remember why i made these async
-            starts_at = await self.parse_datetime(ctx, starts_at, False)
-            ends_at = await self.parse_datetime(ctx, ends_at, False)
-            mentor_starts_at = await self.parse_datetime(ctx, mentor_starts_at, False)
-            mentor_ends_at = await self.parse_datetime(ctx, mentor_ends_at, False)
-            mentee_starts_at = await self.parse_datetime(ctx, mentee_starts_at, False)
-            mentee_ends_at = await self.parse_datetime(ctx, mentee_ends_at, False)
+            starts_at = await self._parse_datetime(ctx, starts_at, False)
+            ends_at = await self._parse_datetime(ctx, ends_at, False)
+            mentor_starts_at = await self._parse_datetime(ctx, mentor_starts_at, False)
+            mentor_ends_at = await self._parse_datetime(ctx, mentor_ends_at, False)
+            mentee_starts_at = await self._parse_datetime(ctx, mentee_starts_at, False)
+            mentee_ends_at = await self._parse_datetime(ctx, mentee_ends_at, False)
 
             # local check function that either fails or gives you both values back
             def check(start, end):
@@ -310,8 +310,8 @@ class Management:
             else:
                 return [to_str(start_dt), to_str(end_dt)]
 
-        start = await self.parse_datetime(ctx, start, False)
-        end = await self.parse_datetime(ctx, end, False)
+        start = await self._parse_datetime(ctx, start, False)
+        end = await self._parse_datetime(ctx, end, False)
 
         chk = False
 
@@ -390,6 +390,42 @@ class Management:
                             inline=False)
             await self.client.say(embed=embed)
 
+    @cycle.command(help="Gets the users of a Cycle")
+    async def users(self, cycle: int):
+        query = 'SELECT cyc.users_id, cyc.gamemodes_id, cyc.types_id, ' \
+                'us.discord_id, us.name, gamemodes.name, cycle_users_types.name ' \
+                'FROM cycle_users as cyc ' \
+                'JOIN users as us ' \
+                'on cyc.users_id = us.id ' \
+                'JOIN gamemodes ' \
+                'on gamemodes.id = cyc.gamemodes_id ' \
+                'join cycle_users_types ' \
+                'on cycle_users_types.id = cyc.types_id ' \
+                'where cyc.cycles_id = {}'.format(cycle)
+        self.cursor.execute(query)
+        results = self.cursor.fetchall()
+        if not results:
+            await self.client.say('No users found!')
+        else:
+            output = dict()
+            output["Mentors"] = str()
+            output["Mentees"] = str()
+            print(results)
+            for result in results:
+                if result[2] == self.cycle_user_types.get('Mentor'):
+                    output["Mentors"] += result[4] + ' '
+                elif result[2] == self.cycle_user_types.get('Mentee'):
+                    output["Mentees"] += result[4] + ' '
+
+            if not output['Mentors']:
+                output['Mentors'] = 'No Users'
+            if not output['Mentees']:
+                output['Mentees'] = 'No Users'
+
+            await self.client.say('Mentors: ' + output['Mentors'])
+            await self.client.say('Mentees: ' + output['Mentees'])
+
+
     @cycle.command(help="Multiple cycles can be considered to be 'active' during mentor signups",
                    brief="Gets the active cycle(s)",
                    description="Gets the active cycle(s)")
@@ -442,7 +478,7 @@ class Management:
                 if not member:
                     await self.client.say("No member matching {}".format(name))
                 else:
-                    results = self.get_member_from_db(member)
+                    results = self._get_member_from_db(member)
 
                     if results:
                         if results[3] == 1:
@@ -491,7 +527,7 @@ class Management:
                 if not member:
                     await self.client.say("No members matching {}".format(name))
                 else:
-                    result = self.get_member_from_db(member)
+                    result = self._get_member_from_db(member)
                     if not result:
                         await self.client.say('User {} is not in database!'.format(name))
                     else:
@@ -511,7 +547,7 @@ class Management:
                 if not member:
                     await self.client.say("No members matching {}".format(name))
                 else:
-                    result = self.get_member_from_db(member)
+                    result = self._get_member_from_db(member)
                     if not result:
                         await self.client.say('User {} is not in database!'.format(name))
                     else:

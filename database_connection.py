@@ -38,7 +38,9 @@ class AuthorityCheck:
 
         # the roles roles list is ~cached~ or whatever this is to minimize the actual times we have to retrieve them
         # from the database
-        # this list currently only refreshes on restart
+        self.cache = list()
+
+    def refresh(self):
         self.cache = list()
 
     def has(self, member, action):
