@@ -2,7 +2,6 @@ import discord
 from discord.ext import commands
 import database_connection as db
 import config
-import formatters
 
 class Debug:
 
