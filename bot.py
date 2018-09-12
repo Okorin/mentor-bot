@@ -40,7 +40,7 @@ async def sync_users():
     await client.wait_until_ready()
     while not client.is_closed:
         print('Scanning for new users')
-        query = 'SELECT discord_id FROM users WHERE discord_id in ('
+        query = 'SELECT discord_id FROM uses WHERE discord_id in ('
 
         # needs two of these because there's no simple way of cloning a generator and getting all members returns one
         members = client.get_all_members()
@@ -78,7 +78,6 @@ async def sync_users():
 
         # async sleep for 3 hours
         await asyncio.sleep(9800)
-
 
 @client.event
 async def on_ready():

@@ -1,3 +1,5 @@
 # mentor-bot
 
-Uploaded mostly for collaborative purposes
+Pycharm is retarded and pushed it under this commit message
+
+thanks pycharm

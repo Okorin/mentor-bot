@@ -38,9 +38,7 @@ class AuthorityCheck:
 
         # the roles roles list is ~cached~ or whatever this is to minimize the actual times we have to retrieve them
         # from the database
-        self.cache = list()
-
-    def refresh(self):
+        # this list currently only refreshes on restart
         self.cache = list()
 
     def has(self, member, action):
@@ -95,7 +93,7 @@ class AuthorityCheck:
     # wraps global authority check up to run always instead of requiring checking it separately
     # (and subsequently forgetting it)
     def can(self, member, action):
-
+        return True
         # if another action is requested
         if action != config.ALL_ACTION_ID:
 
