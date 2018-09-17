@@ -47,11 +47,10 @@ class General:
                       description="Change the bot status",
                       brief="Status",
                       help="... modifies bot informations : game played")
-    async def changeGame(self, ctx):
+    async def changeGame(self, ctx, game : str):
         """Change the bot status."""
         if self.auth.can(ctx.message.author, config.ADMINISTRATE_BOT):
-            game=discord.Game(name=" ".join(ctx.message.content.split()[1:])) # Discord automatically shortens the game if it's too long
-            await self.client.change_presence(game=game)
+            await self.client.change_presence(game=discord.Game(name=game))# Discord automatically shortens the game if it's too long
             print("Game succesfully changed")
 
     @commands.command(pass_context=True,
@@ -71,10 +70,9 @@ class General:
                   description="Change the bot username",
                   brief="Username",
                   help="... modifies bot informations : username")
-    async def setUsername(self, ctx):
+    async def setUsername(self, ctx, name : str):
         """Change the bot username. Limited to twice per hour by discord."""
         if self.auth.can(ctx.message.author, config.ADMINISTRATE_BOT):
-            name = Utils.parse_message_content(ctx)["message"]
             await self.client.edit_profile(username=name)
             print("Username successfully changed")
 
@@ -85,16 +83,19 @@ class General:
     async def setAvatar(self, ctx):
         """Change the bot avatar. Limited by discord ?"""
         if self.auth.can(ctx.message.author, config.ADMINISTRATE_BOT):
-            if ctx.message.attachments: # Multiple links, we choose first, fuck it
+            url = str()
+            if ctx.message.attachments: # Image attached to the command
                 url = ctx.message.attachments[0]['url']
-            else: # Only one
-                url = url.strip('<>')
-
-            with aiohttp.Timeout(10):
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(url) as resp:
-                        await self.client.edit_profile(avatar=await resp.read())
-                        print("Profile picture successfully changed")
+            else: # Link dropped by the user
+                url = " ".join(ctx.message.content.split()[1:])
+            try: # just in case it's a wrong link -> host error ...
+                with aiohttp.Timeout(10):
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(url) as resp:
+                            await self.client.edit_profile(avatar=await resp.read())
+                            print("Profile picture successfully changed")
+            except Exception as e:
+                print('Something happened while trying to modify the PFP : %s' % (e))
 
 def setup(client):
     client.add_cog(General(client, db.cursor, db.auth))
