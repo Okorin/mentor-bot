@@ -80,21 +80,20 @@ class General:
                       description="Change the bot avatar",
                       brief="Avatar",
                       help="... modifies bot informations : avatar")
-    async def setAvatar(self, ctx):
+    async def setAvatar(self, ctx, url=None):
         """Change the bot avatar. Limited by discord ?"""
         if self.auth.can(ctx.message.author, config.ADMINISTRATE_BOT):
-            url = str()
             if ctx.message.attachments: # Image attached to the command
-                url = ctx.message.attachments[0]['url']
+                url = ctx.message.attachments[0]["url"]
             else: # Link dropped by the user
-                url = " ".join(ctx.message.content.split()[1:])
+                url = url = url.strip("<>")
             try: # just in case it's a wrong link -> host error ...
                 with aiohttp.Timeout(10):
                     async with aiohttp.ClientSession() as session:
                         async with session.get(url) as resp:
                             await self.client.edit_profile(avatar=await resp.read())
                             print("Profile picture successfully changed")
-            except Exception as e:
+            except aiohttp.errors.ClientOSError:
                 print('Something happened while trying to modify the PFP : %s' % (e))
 
 def setup(client):
