@@ -86,7 +86,7 @@ class General:
             if ctx.message.attachments: # Image attached to the command
                 url = ctx.message.attachments[0]["url"]
             else: # Link dropped by the user
-                url = url = url.strip("<>")
+                url = url.strip("<>")
             try: # just in case it's a wrong link -> host error ...
                 with aiohttp.Timeout(10):
                     async with aiohttp.ClientSession() as session:
