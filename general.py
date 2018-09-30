@@ -85,8 +85,10 @@ class General:
         if self.auth.can(ctx.message.author, config.ADMINISTRATE_BOT):
             if ctx.message.attachments: # Image attached to the command
                 url = ctx.message.attachments[0]["url"]
-            else: # Link dropped by the user
-                url = url.strip("<>")
+            elif type(url) is str and url.startswith("http"): # Link dropped by the user
+                url = url.strip()
+            else:
+                return print("No valid content to change the avatar")
             try: # just in case it's a wrong link -> host error ...
                 with aiohttp.Timeout(10):
                     async with aiohttp.ClientSession() as session:
