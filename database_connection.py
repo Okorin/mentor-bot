@@ -19,10 +19,14 @@ cursor = conn.cursor()
 class AuthorityCheck:
 
     def __init__(self, connection, bot_roles_table='bot_roles', actions='actions',
-                 permissions='permissions', guild_roles='guild_roles'):
+                 permissions='permissions', guild_roles='guild_roles', debug=False, debug_verbose=False):
         # Database connection
         self.conn = connection
         self.cursor = connection.cursor()
+
+        # debug
+        self.debug = debug
+        self.debug_verbose = debug_verbose
 
         # name of the bot roles table
         self.roles = bot_roles_table
@@ -100,10 +104,32 @@ class AuthorityCheck:
         if action != config.ALL_ACTION_ID:
 
             # the all action logically overwrites all other actions
-            return self.has(member, action) or self.has(member, config.ALL_ACTION_ID)
+            result = self.has(member, action) or self.has(member, config.ALL_ACTION_ID)
+            self._debug(member=member, action=action, result=result)
+            return result
 
         # if it is the all action id only do one check
-        return self.has(member, config.ALL_ACTION_ID)
+        result = self.has(member, config.ALL_ACTION_ID)
+        self._debug(member=member, action=action, result=result)
+        return result
+
+    def _debug(self, **kwargs):
+        # is debugging even on?
+        if self.debug:
+            member = kwargs.get('member')
+            action = kwargs.get('action')
+            result = kwargs.get('result')
+
+            # all 3 params need to be found for now
+            # if they're set, result can be True and verbose has to be on or result can be false regardless of verbosity
+            # basically 'log successful auth checks' or 'log only failed'
+            if member is not None and action is not None and result is not None\
+                    and ((result and self.debug_verbose) or not result):
+
+                print('{member} attempted to use action {action}. '
+                      'The authorization check was performed and returned {result}'.format(member="{}#{}".format(member.name, member.discriminator),
+                                                                                           action=action,
+                                                                                           result=result))
 
 
-auth = AuthorityCheck(conn)
+auth = AuthorityCheck(conn, debug=True, debug_verbose=True)

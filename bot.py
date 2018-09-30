@@ -1,14 +1,12 @@
 import database_connection as db
 import discord.ext.commands as commands
-#from discord import utils
 import discord
 import config
 import datetime
 import asyncio
-from io import BytesIO
+import random
 import html
-import aiohttp
-import json
+from ratelimits import RateLimit
 
 
 class GuildUser:
@@ -33,7 +31,8 @@ class GuildUser:
 # discord client
 client = commands.Bot(command_prefix=config.COMMAND_PREFIX)
 auth = db.auth
-extensions = ['general', 'management', 'debug']
+extensions = ['general', 'management', 'debug', 'channel_manager']
+shitpost_rate = RateLimit(config.SHITPOST_RATE_LIMIT["rate"], config.SHITPOST_RATE_LIMIT["per"])
 
 
 async def sync_users():
@@ -89,8 +88,70 @@ async def on_ready():
 @client.event
 async def on_message(message):
     if isinstance(message.author, discord.Member):
+        if message.author.bot:
+            return
+        manager = client.get_cog("ChannelManager")
+        if manager and manager.is_type(message.channel.id, config.CHANNEL_TYPES["BLACKLISTED"]):
+            print("channel blacklisted!")
+            return
+        await shitpost(message)
         if auth.can(message.author, config.RUN_COMMANDS_ID):
             await client.process_commands(message)
+
+
+async def shitpost(message):
+    # determine a new random number (apparently not assigning it to something causes different behaviour)
+    randint = random.randrange(1, config.TRIGGER_LIKELIHOOD + 1)
+
+    # determine if the random number is the limit
+    # or one of the trigger phrases is in the message
+    # AND the author must not be a bot to avoid playing ping pong with other bots
+    if (randint == config.TRIGGER_LIKELIHOOD
+            or [phrase for phrase in config.TRIGGER_PHRASES if phrase in message.content.lower()]) \
+            and not message.author.bot:
+        await guaranteed_shitpost(message, 5)
+
+
+async def guaranteed_shitpost(message, limit):
+    # get a random date from the created at date of the channel to now
+    randdat = random_date(message.channel.created_at, datetime.datetime.utcnow())
+
+    # read limit amount of log messages (getting one random message is forbidden by the framework)
+    # it tells you to use get message instead but that assumes you know the message's id...
+    generator = client.logs_from(message.channel, limit=limit,
+                                 around=randdat)
+
+    # determine which message to output
+    message_to_output = random.randint(1, limit + 1)
+    counter = 1
+
+    # go through the messages in the generator
+    async for msg in generator:
+
+        # the message needs to have content, im sure af not going to copy all attachments etc...
+        if msg.content and message_to_output == counter:
+
+            # the message must not contain any mentions that the bot could just randomly do
+            if not msg.mentions and not msg.role_mentions and not msg.mention_everyone:
+
+                # determine if the action is being rate limited?
+                secs_til_next = shitpost_rate.is_rate_limited()
+
+                if not secs_til_next:  # do it
+                    await client.send_message(message.channel, msg.content)
+                else:  # print out when to do it.
+                    print('Next attempt can be made in {} seconds'.format(secs_til_next))
+                    break
+            else:
+                message_to_output += 1
+        counter += 1
+
+
+def random_date(start, end):
+    delta = end - start
+    int_delta = (delta.days * 24 * 60 * 60) + delta.seconds
+    random_second = random.randrange(int_delta)
+    return start + datetime.timedelta(seconds=random_second)
 
 
 if __name__ == '__main__':

@@ -3,6 +3,10 @@ import database_connection as db
 from io import BytesIO
 import aiohttp
 import config
+import csv
+from io import StringIO
+from oauth2client.service_account import ServiceAccountCredentials
+import gspread
 import math
 import pprint
 p = pprint.PrettyPrinter(indent=4)
@@ -157,3 +161,68 @@ class TextFormatter(BaseFormatter):
     # returns the amount of characters left to take in a line
     def _static_output_length(self, other_chars: int):
         return config.DISCORD_MAX_LENGTH - other_chars - len(self.opener_closer) * 2
+
+
+class CSVFormatter(BaseFormatter):
+
+    def __init__(self, headings: list, lines: list, column_spacer=',', file_name='Result.csv'):
+        super().__init__(headings, lines)
+
+        self.column_spacer = column_spacer
+
+        self.file_name = file_name
+
+    def get_output(self):
+
+        with StringIO() as buffer:
+            writer = csv.writer(buffer, delimiter=self.column_spacer, quotechar='"', quoting=csv.QUOTE_MINIMAL)
+            writer.writerow(self.headings)
+            for line in self.lines:
+                writer.writerow(line)
+
+            return {"stream": StringIO(buffer.getvalue()), "name": self.file_name}
+
+
+class GoogleSheetsFormatter(BaseFormatter):
+
+    def __init__(self, headings: list, lines: list, resource_name='QueryResult'):
+        super().__init__(headings, lines)
+        self.resource_name = resource_name
+
+    def get_output(self):
+        # don't call len so often, the resources aren't modified anyways
+        # builds the list from the lines provides, passes in the header as the first line
+        list_to_insert = self.lines
+        list_to_insert.insert(0, self.headings)
+        len_headings = len(self.headings)
+        len_lines = len(list_to_insert)
+
+        # get credentials
+        credentials = ServiceAccountCredentials.from_json_keyfile_name(config.CREDENTIALS_FILE,
+                                                                       config.SERVICE_ACCOUNT_SCOPE)
+
+        # authorize them
+        gc = gspread.authorize(credentials)
+
+        # create a new spreadsheet with the desired name
+        sheet = gc.create(self.resource_name)
+
+        # share it as visible to anyone and
+        sheet.share(None, perm_type='anyone', role='reader')
+        sheet.share(config.ADMIN_MAIL_ADDRESS, perm_type='user', role='owner')
+
+        # retrieve a ton of cells from the sheet based on what you want to write into it
+        cells = sheet.sheet1.range(1, 1, len_lines, len_headings)
+
+        # paginate the 2D list into the 1D list
+        y = -1
+        for x, cell in enumerate(cells):
+            if x % len_headings == 0:  # on first run this will be 0
+                y += 1
+            cell.value = self.lines[y][x % len_headings]  # split based on the length
+
+        # call the api to batch update all the cells with these values
+        sheet.sheet1.update_cells(cells)
+
+        # return a link to the spreadsheet back to the caller
+        return "https://docs.google.com/spreadsheets/d/{}".format(sheet.id)
